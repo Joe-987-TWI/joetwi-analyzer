@@ -70,7 +70,7 @@ if uploaded_file is not None:
                 """
 
                 # ยิงไปที่หน้าต่าง API ของ Google โดยตรง (เลี่ยงบั๊ก SDK)
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
                 payload = {
                     "contents": [
