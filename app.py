@@ -1,6 +1,8 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import base64
 from PIL import Image
+import io
 
 # 1. ตั้งค่าหน้าเว็บหน้าตาคลีนๆ
 st.set_page_config(page_title="TWI Analyzer - พี่โจ รีเจนตามงบ", page_icon="📊", layout="centered")
@@ -13,7 +15,6 @@ st.write("---")
 # 2. ดึง API Key อย่างปลอดภัยจากระบบหลังบ้าน (Secrets)
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key, transport='rest')
 except Exception as e:
     st.error("⚠️ ไม่พบ API Key ในระบบหลังบ้าน กรุณาตั้งค่า Secrets บน Streamlit Cloud ก่อนครับ!")
     st.stop()
@@ -29,8 +30,16 @@ if uploaded_file is not None:
     if st.button("🚀 เริ่มสแกนและวิเคราะห์ผลด่วน"):
         with st.spinner('เลขาจีกำลังใช้ AI สแกนรูปภาพและคำนวณตามสูตร TWI สักครู่ครับ...'):
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # แปลงรูปภาพเป็น Base64 เพื่อส่งให้ API ตรงๆ
+                buffered = io.BytesIO()
+                img_format = image.format if image.format else "PNG"
+                image.save(buffered, format=img_format)
+                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                 
+                mime_type = f"image/{img_format.lower()}"
+                if mime_type == "image/jpg":
+                    mime_type = "image/jpeg"
+
                 # ร่างคำสั่งลอจิก TWI ฝังในหัวบอท
                 prompt = """
                 คุณคือ บอทวิเคราะห์สินค้าทำเงิน TWI (TikTok Winner Index) ประจำช่อง พี่โจ รีเจนตามงบ
@@ -59,12 +68,36 @@ if uploaded_file is not None:
                 [ถ้าได้ ต่ำกว่า 50: 🔴 ปัดตกทันที! อย่าหาทำ เสี่ยงเหนื่อยฟรี ตลาดตันหรือขายยากเกินไป]
                 ---
                 """
-                
-                # ส่งรูป + คำสั่งไปให้บอทคำนวณ
-                response = model.generate_content([prompt, image])
-                
-                st.success("✨ วิเคราะห์เสร็จเรียบร้อย!")
-                st.markdown(response.text)
-                
+
+                # ยิงไปที่หน้าต่าง API ของ Google โดยตรง (เลี่ยงบั๊ก SDK)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt},
+                                {
+                                    "inlineData": {
+                                        "mimeType": mime_type,
+                                        "data": img_base64
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+
+                response = requests.post(url, headers=headers, json=payload)
+                res_json = response.json()
+
+                if response.status_code == 200:
+                    output_text = res_json['contents'][0]['parts'][0]['text']
+                    st.success("✨ วิเคราะห์เสร็จเรียบร้อย!")
+                    st.markdown(output_text)
+                else:
+                    error_msg = res_json.get('error', {}).get('message', 'Unknown error')
+                    st.error(f"ระบบหลังบ้าน Google แจ้งข้อผิดพลาด: {error_msg}")
+                    
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
