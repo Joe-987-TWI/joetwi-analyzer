@@ -13,7 +13,7 @@ st.write("---")
 # 2. ดึง API Key อย่างปลอดภัยจากระบบหลังบ้าน (Secrets)
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    genai.configure(api_key=api_key, transport='rest')
 except Exception as e:
     st.error("⚠️ ไม่พบ API Key ในระบบหลังบ้าน กรุณาตั้งค่า Secrets บน Streamlit Cloud ก่อนครับ!")
     st.stop()
